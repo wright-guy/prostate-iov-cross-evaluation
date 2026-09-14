@@ -1,0 +1,318 @@
+# Department prostate treatment planning protocol: "Definitive Prostate +/- SV: 78 Gy to D95".
+# Transcribed from PMBaaa50c supplementary material, Table 1 (pages 1-2), 2026-09-04.
+#
+# The protocol is three-tier, not binary: per-protocol / minor variation / major
+# variation. That is better than the binary pass/fail assumed in planning document
+# section 7.3, so the flip-rate analysis reports both:
+#   * binary  — per-protocol versus not, as section 7.3 specifies
+#   * ordinal — the full 3x3 tier-transition matrix, which distinguishes a plan that
+#               slips from per-protocol into minor variation from one that goes to major
+#
+# TIER LOGIC
+#   better: lower   value <  per_protocol -> per_protocol
+#                   value <  minor        -> minor
+#                   else                  -> major
+#   better: higher  value >= per_protocol -> per_protocol
+#                   value >= minor        -> minor
+#                   else                  -> major
+#   `floor` marks a two-sided constraint: below it the plan is under-dosed, which the
+#   protocol table does not tier, so it is recorded separately rather than guessed at.
+#
+# APPLICABILITY
+#   available   — computable per observer from the contour sets in this dataset
+#   patient     — computable, but only from a patient-level structure (EXTERNAL), so it
+#                 does not vary with the evaluation contour
+#   unavailable — the structure does not exist per observer; excluded, with the reason
+
+prescription:
+  total_dose_gy: 78.0
+  n_fractions: 39
+  dose_per_fraction_gy: 2.0
+  clinical_normalisation: PTV78 D95 = 78 Gy
+  note: >-
+    The clinical protocol prescribes 78 Gy to PTV D95. The research plans in this study
+    are CTV-optimised with no PTV objective, and their diagonal PTV D95 lands at
+    76.4-78.0 Gy while diagonal CTV D50 is pinned at 80.25 Gy (SD 0.128). They therefore
+    do NOT meet the clinical prescription convention, by design. Every PTV-based
+    constraint below must be interpreted in that light, and stage 08 reports which
+    constraints are degenerate (every plan in the same tier), because a constraint that
+    never changes tier contributes no information to a flip rate.
+
+constraints:
+
+  # ------------------------------------------------------------------- target
+
+  - id: ptv_d95
+    label: PTV78 D95
+    structure: PTV
+    metric: {kind: d_at_volume_pct, pct: 95}
+    unit: Gy
+    better: higher
+    tiers: {per_protocol: 78.0, minor: 76.2}
+    applicability: available
+    note: >-
+      The prescription constraint. Expect systematic minor/major variation across all
+      plans because nothing was optimised against the PTV.
+
+  - id: ptv_d50
+    label: PTV78 D50
+    structure: PTV
+    metric: {kind: d_at_volume_pct, pct: 50}
+    unit: Gy
+    better: lower
+    tiers: {per_protocol: 81.5, minor: 82.0}
+    floor: 78.0
+    applicability: available
+
+  - id: ptv_d2
+    label: PTV78 D2
+    structure: PTV
+    metric: {kind: d_at_volume_pct, pct: 2}
+    unit: Gy
+    better: lower
+    tiers: {per_protocol: 81.9, minor: 83.5}
+    applicability: available
+
+  - id: ctv_d99
+    label: CTV78 D99
+    structure: CTV
+    metric: {kind: d_at_volume_pct, pct: 99}
+    unit: Gy
+    better: higher
+    tiers: {per_protocol: 78.0, minor: 76.2}
+    applicability: available
+
+  - id: sv_d90
+    label: SV D90
+    structure: SeminalVesicles
+    metric: {kind: d_at_volume_pct, pct: 90}
+    unit: Gy
+    better: higher
+    tiers: {per_protocol: 78.5, minor: 78.0}
+    applicability: unavailable
+    reason: >-
+      These plans are the prostate-only arm of the protocol ("Definitive Prostate"
+      rather than "+ SV"), so the seminal vesicles were never a target. Measured: the
+      seminal vesicles overlap their own observer's CTV by a median of 0.3% of SV
+      volume, and SV D90 under that observer's own plan is 33 Gy against a protocol aim
+      of 78.5 Gy. The protocol row refers to CTV_SV, a target sub-volume, whereas
+      Seminal_Vesc_<observer> here is an anatomical contour that was drawn but not
+      treated. Scoring it would report 100% major variation across all 530 cells, which
+      would be an artefact of applying the wrong arm of the protocol.
+      Incidental SV dose is real and observer-dependent (median Dmean 59.8 Gy, V70
+      43.6%) and is reported descriptively, not as a constraint.
+
+  - id: dmax_global
+    label: Global Dmax
+    structure: EXTERNAL
+    metric: {kind: d_max}
+    unit: Gy
+    better: lower
+    tiers: {per_protocol: 83.5, minor: 85.8}
+    applicability: patient
+    note: >-
+      Scored on the patient-level EXTERNAL contour, so it does not vary with the
+      evaluation contour and contributes to plan-side variance only.
+
+  - id: dmax_location
+    label: Dmax location
+    structure: EXTERNAL
+    metric: {kind: d_max_location, regions: [CTV, PTV_minus_CTV, outside_PTV]}
+    unit: category
+    better: categorical
+    tiers: {per_protocol: CTV, minor: PTV_minus_CTV, major: outside_PTV}
+    applicability: available
+    note: >-
+      Categorical, and genuinely contour-dependent: the same dose maximum falls inside
+      or outside the CTV depending on whose CTV is used to score it.
+
+  - id: ant_prostate_d90
+    label: Anterior prostate D90
+    structure: null
+    metric: {kind: d_at_volume_pct, pct: 90}
+    unit: Gy
+    better: higher
+    tiers: {per_protocol: 79.0, minor: 78.5}
+    applicability: unavailable
+    reason: >-
+      Requires CTV_ANTPROST, which exists only in the legacy clinical structure set and
+      was not contoured by the ten observers.
+
+  # ------------------------------------------------------------------- rectum
+
+  - id: rectum_v40
+    label: Rectum V40
+    structure: Rectum
+    metric: {kind: v_at_dose_pct, dose_gy: 40.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 50.0, minor: 60.0}
+    applicability: available
+
+  - id: rectum_v50
+    label: Rectum V50
+    structure: Rectum
+    metric: {kind: v_at_dose_pct, dose_gy: 50.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 40.0, minor: 50.0}
+    applicability: available
+
+  - id: rectum_v60
+    label: Rectum V60
+    structure: Rectum
+    metric: {kind: v_at_dose_pct, dose_gy: 60.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 30.0, minor: 35.0}
+    applicability: available
+
+  - id: rectum_v65
+    label: Rectum V65
+    structure: Rectum
+    metric: {kind: v_at_dose_pct, dose_gy: 65.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 20.0, minor: 25.0}
+    applicability: available
+
+  - id: rectum_v70
+    label: Rectum V70
+    structure: Rectum
+    metric: {kind: v_at_dose_pct, dose_gy: 70.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 10.0, minor: 20.0}
+    applicability: available
+
+  - id: rectum_v75
+    label: Rectum V75
+    structure: Rectum
+    metric: {kind: v_at_dose_pct, dose_gy: 75.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 5.0, minor: 10.0}
+    applicability: available
+
+  - id: rectum_prv_v80
+    label: Rectum PRV V80
+    structure: Rectum_PRV_3mm
+    metric: {kind: v_at_dose_cc, dose_gy: 80.0}
+    unit: cc
+    better: lower
+    tiers: {per_protocol: 1.0, minor: 1.0}
+    applicability: available
+    derived: true
+    note: >-
+      RECT_78_03_NS in the clinical set is a 3 mm PRV expansion of the rectum. Rebuilt
+      per observer in stage 04. Effectively binary: the protocol gives the same 1 cc
+      bound for per-protocol and minor variation.
+
+  - id: rectum_in_ptv_v79
+    label: Rectum inside PTV, V79
+    structure: Rectum_in_PTV
+    metric: {kind: v_at_dose_cc, dose_gy: 79.0}
+    unit: cc
+    better: lower
+    tiers: {per_protocol: 1.0, minor: 2.0}
+    applicability: available
+    derived: true
+    composite_of: [Rectum, PTV]
+
+  - id: rectum_outside_ptv_v78
+    label: Rectum outside PTV, V78
+    structure: Rectum_outside_PTV
+    metric: {kind: v_at_dose_cc, dose_gy: 78.0}
+    unit: cc
+    better: lower
+    tiers: {per_protocol: 1.0, minor: 2.0}
+    applicability: available
+    derived: true
+    composite_of: [Rectum, PTV]
+
+  - id: rectum_post_wall_dmax
+    label: Rectum posterior wall Dmax
+    structure: null
+    metric: {kind: d_max}
+    unit: Gy
+    better: lower
+    tiers: {per_protocol: 39.0, minor: 45.0}
+    applicability: unavailable
+    reason: >-
+      Requires a posterior rectal wall structure. POSTRECT_NS exists in the legacy
+      clinical set only; the observers contoured whole rectum, not the wall. Deriving a
+      posterior wall from a solid rectum would invent a convention the observers never
+      applied, and its definition is exactly what varies between them.
+
+  - id: rectum_prw_slices
+    label: Slices where the 50% isodose crosses the posterior rectal wall
+    structure: null
+    metric: {kind: slice_count}
+    unit: slices
+    better: lower
+    tiers: {per_protocol: 0, minor: 5}
+    applicability: unavailable
+    reason: As rectum_post_wall_dmax — no per-observer posterior rectal wall.
+
+  # ------------------------------------------------------------------ bladder
+
+  - id: bladder_v50
+    label: Bladder V50
+    structure: Bladder
+    metric: {kind: v_at_dose_pct, dose_gy: 50.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 40.0, minor: 50.0}
+    applicability: available
+
+  - id: bladder_v60
+    label: Bladder V60
+    structure: Bladder
+    metric: {kind: v_at_dose_pct, dose_gy: 60.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 30.0, minor: 40.0}
+    applicability: available
+
+  # ------------------------------------------------------------------- other
+
+  - id: urethra_prv_v82
+    label: Urethra PRV V82
+    structure: null
+    metric: {kind: v_at_dose_cc, dose_gy: 82.0}
+    unit: cc
+    better: lower
+    tiers: {per_protocol: 0.1, minor: 1.0}
+    applicability: unavailable
+    reason: No urethra contour exists in this dataset, per observer or clinically.
+
+  - id: femoral_heads_v40
+    label: Femoral heads V40
+    structure: null
+    metric: {kind: v_at_dose_pct, dose_gy: 40.0}
+    unit: percent
+    better: lower
+    tiers: {per_protocol: 10.0, minor: 20.0}
+    applicability: unavailable
+    reason: No femoral head contours exist in this dataset.
+
+  - id: peripheral_tissue_v50
+    label: Peripheral tissue V50 beyond PTV + 3.5 cm
+    structure: Peripheral_Tissue
+    metric: {kind: v_at_dose_cc, dose_gy: 50.0}
+    unit: cc
+    better: lower
+    tiers: {per_protocol: 1.0, minor: 2.0}
+    applicability: available
+    derived: true
+    composite_of: [EXTERNAL, PTV]
+    note: >-
+      P_TISSUE in the clinical set. Rebuilt per observer as EXTERNAL minus a 35 mm
+      expansion of that observer's PTV.
+
+# In a cross-evaluation cell, a composite structure is built entirely from the assumed
+# true anatomy j, never mixing j's rectum with i's PTV. The plan enters only through the
+# dose distribution. Recorded here because the alternative is a defensible-looking
+# choice that would quietly confound plan-side and evaluation-side effects, which is
+# precisely the separation hypothesis H5 depends on.
+composite_structure_rule: evaluation_side_only

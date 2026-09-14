@@ -1,0 +1,45 @@
+# The common analysis grid. Every contour is rasterised onto it and every dose is
+# resampled onto it, so a cross-evaluation cell is array arithmetic on shared geometry.
+
+analysis_grid:
+
+  # In-plane resolution, common to all patients so metrics are comparable between them.
+  # The planning CTs range from 1.04 to 1.24 mm, so this is a mild upsample.
+  in_plane_mm: 1.0
+
+  # Slice spacing. `native_ct` keeps the grid's z planes exactly coincident with the
+  # planning CT slice positions.
+  #
+  # This is the important decision on the geometry side. A 1 mm isotropic grid would
+  # be nicer for surface metrics, but contours exist ONLY at CT slice positions, and
+  # 2.5 mm is not a multiple of 1 mm, so most contours would land between planes and
+  # have to be interpolated. That means inventing geometry the data does not contain.
+  # Keeping z native means every contour lands exactly on a plane and nothing is
+  # invented; the cost is that HD95 and surface DSC carry a floor set by the slice
+  # thickness (2.5 mm for K018/K042/M020/M030, 2.0 mm for V027), which is stated in
+  # the methods rather than hidden. Surface extraction uses marching cubes with the
+  # true anisotropic spacing, which handles the anisotropy correctly.
+  slice_spacing: native_ct
+
+  # Padding around the union of the extent-defining structures. Enough to hold the
+  # CTV+7 mm expansion shell and the +/-5 mm rigid dose shifts with room to spare.
+  margin_mm: 20.0
+
+  # Structures whose union sets the grid extent. Colon and bowel bag are excluded
+  # deliberately: they are not comparable between observers and would inflate every
+  # grid by hundreds of millimetres.
+  extent_structures: [CTV, PTV, Rectum, Bladder, SeminalVesicles]
+
+# In-plane resolutions for the stage 03 convergence study. Volume, D2cc and HD95 are
+# recomputed at each and reported, so the choice of 1.0 mm above is evidenced rather
+# than asserted.
+convergence_ladder_mm: [2.5, 2.0, 1.5, 1.0, 0.75]
+
+# Tolerances for the Tier 2 round-trip check: rasterised mask volume against the
+# independent shoelace volume from the polygons.
+volume_agreement:
+  warn_above: 0.02    # 2%
+  fail_above: 0.05    # 5%
+  # Small structures have a high surface-to-volume ratio, so a fixed relative
+  # tolerance is unfair to them; below this volume the check warns instead of failing.
+  small_structure_cc: 5.0

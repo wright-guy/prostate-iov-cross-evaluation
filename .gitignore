@@ -1,0 +1,36 @@
+# Patient data, and everything derived from them, are private: never committed
+/data/
+/derived/
+/results/
+/qc/
+/figures/
+/deliverables/
+paper/
+*.dcm
+*.parquet
+*.csv
+*.npz
+*.npy
+*.nii
+*.nii.gz
+
+# Local observer key: never committed
+config/observer_key.local.yaml
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+venv/
+*.egg-info/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+
+# OS / editor
+.DS_Store
+Thumbs.db
+~$*
+.idea/
+.vscode/
+node_modules/

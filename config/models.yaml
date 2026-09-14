@@ -1,0 +1,155 @@
+# Radiobiological models. Every parameter is attributable to a named publication, and
+# every choice that is ours rather than the source's is marked as such.
+#
+# A standing caveat that belongs in the discussion, not just here: this study reports
+# DIFFERENCES in TCP and NTCP across contour sets at a fixed delivered dose. Absolute
+# values depend on model calibration and should not be read as predictions of outcome
+# for these patients. What the design measures robustly is the local slope -- how much
+# predicted risk moves when only the scoring contour changes.
+
+fractionation:
+  n_fractions: 39
+  prescription_gy: 78.0
+
+alpha_beta_gy:
+  prostate: 1.5
+  rectum: 3.0
+  bladder: 3.0
+  source: >-
+    Prostate 1.5 Gy is the widely used low value from the hypofractionation literature
+    (Dasu 2007; Miralbell 2012). Late rectal and bladder toxicity 3 Gy per QUANTEC's
+    late-responding normal tissue convention.
+
+# ---------------------------------------------------------------------------- NTCP
+
+ntcp:
+  model: lkb
+  description: >-
+    Lyman-Kutcher-Burman. gEUD is computed from the EQD2-converted differential DVH,
+    then NTCP = Phi((gEUD - TD50) / (m * TD50)).
+
+  volume_normalisation:
+    # Reported both ways, as planning document section 5 requires. The difference
+    # between them is the mechanical dilution artefact: a larger scoring contour
+    # dilutes the relative DVH without any change in delivered dose.
+    - relative       # v_i = V_i / V_structure
+    - absolute       # v_i = V_i / V_reference, with V_reference fixed per structure
+  absolute_reference_volume_cc:
+    Rectum: 50.6     # cohort median rectum volume across all 59 contour sets
+    Bladder: 140.8   # cohort median bladder volume
+    note: >-
+      OUR CHOICE, not from the source publications. Fixing the denominator at the cohort
+      median is what isolates the dilution artefact: under absolute normalisation a
+      change in contour size changes the numerator only, so the difference between the
+      two normalisations is the artefact itself. Recomputed by stage 09 from
+      results/structures.parquet, not hard-coded into the analysis.
+
+  endpoints:
+
+    - id: rectum_late_bleeding
+      structure: Rectum
+      label: Late rectal toxicity, Grade >= 2
+      n: 0.09
+      m: 0.13
+      td50_gy: 76.9
+      alpha_beta_gy: 3.0
+      source: >-
+        QUANTEC rectum: Michalski JM, Gay H, Jackson A, Tucker SL, Deasy JO.
+        Radiation dose-volume effects in radiation-induced rectal injury.
+        Int J Radiat Oncol Biol Phys 2010;76(3 Suppl):S123-S129.
+      note: >-
+        The QUANTEC rectal analysis is based on whole-rectum contours including the
+        wall and lumen, which matches the observer contours here. Its dose-volume
+        constraints were derived at conventional fractionation, so EQD2 conversion at
+        2 Gy per fraction is close to the identity for this cohort.
+
+    - id: bladder_late_toxicity
+      structure: Bladder
+      label: Late bladder toxicity, Grade >= 3
+      n: 0.5
+      m: 0.11
+      td50_gy: 80.0
+      alpha_beta_gy: 3.0
+      source: >-
+        Emami B et al. Tolerance of normal tissue to therapeutic irradiation.
+        Int J Radiat Oncol Biol Phys 1991;21(1):109-122, with the LKB fit of
+        Burman C et al., same issue, 123-135.
+      note: >-
+        QUANTEC's bladder review (Viswanathan AN, Yorke ED, Marks LB, Eifel PJ,
+        Shipley WU. Radiation dose-volume effects of the urinary bladder. Int J Radiat
+        Oncol Biol Phys 2010;76(3 Suppl):S116-S122) concluded that the available data
+        were inadequate to derive new dose-volume parameters and did not supersede
+        Emami/Burman. This is therefore the QUANTEC-endorsed set rather than a QUANTEC
+        fit, and the distinction is stated in the methods.
+        Bladder filling is not controlled between the planning CT and delivery, so
+        absolute bladder NTCP is weakly identified; the differential across contour
+        sets remains interpretable and is what this study reports.
+
+# ----------------------------------------------------------------------------- TCP
+
+tcp:
+  model: poisson_lq
+  description: >-
+    Voxel-level Poisson tumour control with linear-quadratic cell kill and Gaussian
+    inter-patient heterogeneity in radiosensitivity:
+      TCP = integral over alpha of N(alpha; alpha_mean, sigma_alpha)
+            * exp(-sum_i rho * v_i * exp(-alpha*D_i - beta*D_i*d_i)) d alpha
+    Heterogeneity in alpha is what gives a realistic population dose-response slope; a
+    single-alpha model is far too steep and would exaggerate every contour effect.
+
+  alpha_mean_per_gy: 0.15
+  sigma_alpha_per_gy: 0.04
+  alpha_beta_gy: 1.5
+  clonogen_density_per_cc: 1.0e7
+  source: >-
+    Nahum AE, Sanchez-Nieto B. Tumour control probability modelling: basic principles
+    and applications in treatment planning. Phys Medica 2001;17(Suppl 2):13-23; and
+    Nahum AE, Movsas B, Horwitz EM, Stobbe CC, Chapman JD. Incorporating clinical
+    measurements of hypoxia into tumor local control modeling of prostate cancer.
+    Int J Radiat Oncol Biol Phys 2003;57(2):391-401.
+
+  clonogen_convention:
+    # Both are computed for every cell. Section 5 requires this: under fixed density a
+    # larger contour contains more clonogens and therefore reports a lower TCP at
+    # identical dose, which is an artefact of the contour, not a dose effect.
+    - fixed_density   # N = rho * V_contour, so N varies with contour size
+    - fixed_number    # N = rho * V_reference, so N is the same for every contour
+  fixed_number_reference_volume_cc:
+    CTV: 50.6         # cohort median CTV volume; recomputed by stage 09
+    note: OUR CHOICE, as for the NTCP absolute reference. Isolates the same artefact.
+
+  calibration:
+    # OUR CHOICE, and the one place in this config where a published parameter is
+    # deliberately overridden. Recorded here rather than buried in code.
+    #
+    # At the published density of 1e7 per cm3 the model returns TCP = 0.975 at 78 Gy to
+    # a 50.6 cm3 target, with a local slope under 2% per Gy. That is the flat top of the
+    # sigmoid: every difference between contour sets would be compressed toward zero,
+    # and the paper would be reporting where the model sits on its own curve rather than
+    # anything about contouring.
+    #
+    # Solving for the density that gives 85% control at the prescription puts the model
+    # on the steep part: rho = 2.44e8 per cm3, local slope 3.5% per Gy at 78 Gy and a
+    # maximum slope of 6.6% per Gy, which is a clinically representative dose-response.
+    mode: solve_for_target_tcp
+    target_tcp: 0.85
+    at_uniform_dose_gy: 78.0
+    at_volume_cc: 50.6
+    target_tcp_source: >-
+      Representative 5-year biochemical control for intermediate-risk prostate cancer at
+      78 Gy in 2 Gy fractions. Kuban DA et al., Long-term results of the M. D. Anderson
+      randomized dose-escalation trial. Int J Radiat Oncol Biol Phys 2008;70(1):67-74.
+    resulting_density_per_cc: 2.444e8
+    sensitivity:
+      # Every TCP result is reported at both densities. If the two disagree
+      # qualitatively, the TCP conclusions are calibration-dependent and must say so.
+      - calibrated      # 2.44e8, the primary
+      - as_published    # 1.0e7, saturating
+
+  calibration_check:
+    # Reported alongside every result so the operating point is visible rather than
+    # buried in the parameters.
+    uniform_dose_gy: 78.0
+    volume_cc: 50.6
+    expected_tcp: 0.85
+    expected_local_slope_per_gy: 0.035

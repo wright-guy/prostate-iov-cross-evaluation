@@ -1,0 +1,105 @@
+# Canonical structure definitions. `roi` is a Python format template resolved with
+# {set} = contour-set id (observer initials, VOTE or STAPLE). Matching against the
+# RTSTRUCT is case-insensitive on the whole name but the alias map in dataset.yaml
+# governs the set token, so case variants of one name never collide.
+#
+# plausibility bands are deliberately wide: they catch a rasterisation or unit error,
+# not clinical outliers. Cohort-relative outlier detection is a separate Tier 2 check.
+
+structures:
+
+  CTV:
+    roi: "CTV_CT_{set}"
+    role: target
+    in_analysis: true
+    fill: even_odd
+    plausible_volume_cc: [10, 150]
+    note: The optimisation target. Plans are CTV-optimised (user, 2026-09-04).
+
+  PTV:
+    roi: "PTV_{set}"
+    role: evaluation_shell
+    in_analysis: true
+    fill: even_odd
+    plausible_volume_cc: [30, 400]
+    note: >-
+      Isotropic expansion of the CTV created AFTER planning (user, 2026-09-04).
+      Not an optimisation structure. Used for the Tier 1 self-plan identifiability
+      test and for incidental-coverage reporting only.
+      The expansion distance appears nowhere in the DICOM and was measured back out of
+      the masks in stage 03: the median CTV-surface-to-PTV-surface distance is
+      7.07 mm in all five patients (IQR 1.0 mm), with no anterior/posterior/lateral
+      asymmetry. The margin is 7 mm isotropic.
+
+  Rectum:
+    roi: "Rectum_{set}"
+    role: oar
+    in_analysis: true
+    fill: even_odd
+    plausible_volume_cc: [15, 150]
+    absolute_volume_endpoints: true   # requires 100% dose-grid containment
+
+  Bladder:
+    roi: "Bladder_{set}"
+    role: oar
+    in_analysis: true
+    fill: even_odd
+    plausible_volume_cc: [30, 600]
+    absolute_volume_endpoints: true
+
+  SeminalVesicles:
+    roi: "Seminal_Vesc_{set}"
+    role: descriptive
+    in_analysis: false
+    fill: even_odd
+    plausible_volume_cc: [1, 60]
+    note: >-
+      Routinely two disjoint loops per slice (bilateral). Extracted and reported
+      descriptively; absent for VOTE and STAPLE.
+
+  PRS:
+    roi: "PRS_{set}"
+    role: unknown
+    in_analysis: false
+    fill: even_odd
+    plausible_volume_cc: [10, 600]
+    note: PENDING Q9 — definition not established. Extracted, not analysed.
+
+  Colon:
+    roi: "Colon_{set}"
+    role: descriptive
+    in_analysis: false
+    fill: even_odd
+    plausible_volume_cc: [5, 1500]
+    note: >-
+      Not comparable between observers (5 to 77 slices for the same patient).
+      Extracted for the record only.
+
+  BowelBag:
+    roi: "Bowel_Bag_{set}"
+    role: descriptive
+    in_analysis: false
+    fill: even_odd
+    plausible_volume_cc: [20, 3000]
+    note: Same as Colon. K018's reaches the global dose maximum for some observers.
+
+# Per-(patient, set, structure) ROI-name overrides where the template is ambiguous.
+overrides:
+  - patient: K042
+    contour_set: O7
+    structure: Rectum
+    roi: Rectum_{set}
+    reason: >-
+      K042 also contains Rectum2_O7. PENDING Q11 — the template match is used until
+      confirmed; the duplicate is recorded by Tier 2 QC and never silently merged.
+
+# Structure sets whose ROI list is legitimately incomplete.
+partial_sets:
+  VOTE: [CTV, PTV, Rectum, Bladder]
+  STAPLE: [CTV, PTV, Rectum, Bladder]
+
+# STAPLE names its PTV differently from every other set.
+roi_exceptions:
+  - contour_set: STAPLE
+    structure: PTV
+    roi: PTV78_STAPLE

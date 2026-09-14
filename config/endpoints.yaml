@@ -1,0 +1,110 @@
+# Every endpoint in planning document section 5, declared once so the pipeline and the
+# protocol cannot drift apart. Stage 08 computes exactly this list for all 530 cells.
+#
+# Naming: `pct` endpoints are relative to the structure volume, `cc` are absolute and
+# require 100% dose-grid containment (Tier 3 confirmed that holds for every cell).
+
+prescription_gy: 78.0
+isodose_95pct_gy: 74.1     # 95% of the prescription, for V95% and the treated volume
+
+target:
+  structure: CTV
+  endpoints:
+    - {id: ctv_d98, kind: d_at_volume_pct, pct: 98, unit: Gy}
+    - {id: ctv_d95, kind: d_at_volume_pct, pct: 95, unit: Gy}
+    - {id: ctv_d50, kind: d_at_volume_pct, pct: 50, unit: Gy}
+    - {id: ctv_d2, kind: d_at_volume_pct, pct: 2, unit: Gy}
+    - {id: ctv_dmean, kind: mean_dose, unit: Gy}
+    - {id: ctv_v95pct, kind: v_at_dose_pct, dose_gy: 74.1, unit: percent}
+    - {id: ctv_hi, kind: homogeneity_index, unit: dimensionless,
+       formula: (D2 - D98) / D50}
+
+# Section 5's coverage-degradation ladder. These are expansion shells characterising
+# the incidental margin and the boundary dose gradient. They are NOT PTVs and must not
+# be called PTVs in the paper -- nothing was optimised against them.
+coverage_ladder:
+  base_structure: CTV
+  expansions_mm: [0, 3, 5, 7]
+  endpoints:
+    - {id: ladder_d98, kind: d_at_volume_pct, pct: 98, unit: Gy}
+    - {id: ladder_v95pct, kind: v_at_dose_pct, dose_gy: 74.1, unit: percent}
+  gradient:
+    id: boundary_dose_gradient
+    unit: percent_per_mm
+    definition: >-
+      Linear regression of D98 (as a percentage of prescription) against expansion
+      distance across the 0/3/5/7 mm rungs. This is the quantitative form of the
+      CTV-optimisation limitation, replacing a hand-waved caveat with a number.
+  note: >-
+    The existing PTV is a 7 mm isotropic expansion (measured in stage 03, median
+    7.07 mm in all five patients), so the +7 mm rung can be cross-checked against a
+    structure that was actually drawn.
+
+oars:
+
+  - structure: Rectum
+    relative:
+      - {id: rectum_v70pct, kind: v_at_dose_pct, dose_gy: 70.0, unit: percent}
+      - {id: rectum_v65pct, kind: v_at_dose_pct, dose_gy: 65.0, unit: percent}
+      - {id: rectum_v60pct, kind: v_at_dose_pct, dose_gy: 60.0, unit: percent}
+      - {id: rectum_v50pct, kind: v_at_dose_pct, dose_gy: 50.0, unit: percent}
+      - {id: rectum_dmean, kind: mean_dose, unit: Gy}
+    absolute:
+      - {id: rectum_d2cc, kind: d_at_volume_cc, cc: 2.0, unit: Gy}
+      - {id: rectum_d1cc, kind: d_at_volume_cc, cc: 1.0, unit: Gy}
+      - {id: rectum_v70cc, kind: v_at_dose_cc, dose_gy: 70.0, unit: cc}
+      - {id: rectum_v60cc, kind: v_at_dose_cc, dose_gy: 60.0, unit: cc}
+
+  - structure: Bladder
+    relative:
+      - {id: bladder_v70pct, kind: v_at_dose_pct, dose_gy: 70.0, unit: percent}
+      - {id: bladder_v65pct, kind: v_at_dose_pct, dose_gy: 65.0, unit: percent}
+      - {id: bladder_dmean, kind: mean_dose, unit: Gy}
+    absolute:
+      - {id: bladder_d2cc, kind: d_at_volume_cc, cc: 2.0, unit: Gy}
+      - {id: bladder_v70cc, kind: v_at_dose_cc, dose_gy: 70.0, unit: cc}
+
+conformity:
+  treated_volume:
+    id: treated_volume_cc
+    definition: ICRU 83 treated volume, the volume enclosed by the 95% isodose (74.1 Gy)
+    unit: cc
+    note: >-
+      A property of the plan alone, so it is constant down a column of the
+      cross-evaluation matrix and contributes only plan-side variance.
+  paddick:
+    id: paddick_ci
+    unit: dimensionless
+    formula: (TV_intersect_CTV)^2 / (TV * CTV)
+    note: >-
+      Computed against each evaluation contour j. Unlike D98 this penalises over- and
+      under-coverage symmetrically, so it is also used as the second, independent
+      mapping statistic promised in DECISIONS.md.
+
+biological:
+  # Parameters, sources and the clonogen-density calibration are in config/models.yaml.
+  - {id: tcp_fixed_density, model: tcp, convention: fixed_density}
+  - {id: tcp_fixed_number, model: tcp, convention: fixed_number}
+  - {id: ntcp_rectum_relative, model: ntcp, endpoint: rectum_late_bleeding,
+     normalisation: relative}
+  - {id: ntcp_rectum_absolute, model: ntcp, endpoint: rectum_late_bleeding,
+     normalisation: absolute}
+  - {id: ntcp_bladder_relative, model: ntcp, endpoint: bladder_late_toxicity,
+     normalisation: relative}
+  - {id: ntcp_bladder_absolute, model: ntcp, endpoint: bladder_late_toxicity,
+     normalisation: absolute}
+
+# Section 5's volume-normalisation artefact, quantified explicitly rather than argued.
+normalisation_artefact:
+  method: >-
+    Recompute every biological endpoint holding the dose distribution fixed and changing
+    only the scoring volume. The difference between relative and absolute normalisation
+    (NTCP) and between fixed density and fixed number (TCP) IS the artefact: it is the
+    part of the apparent variability that is mechanical dilution rather than dose.
+  reported_as: >-
+    Fraction of the observed spread in each biological endpoint attributable to volume
+    normalisation, per structure, per arm.
+
+# Primary endpoints for the Aim 3 prediction models. Pre-specified to avoid selecting
+# them after seeing which predict best.
+primary_for_prediction: [ctv_d98, ntcp_rectum_relative]

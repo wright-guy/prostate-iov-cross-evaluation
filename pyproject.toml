@@ -1,0 +1,44 @@
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "mcx"
+version = "0.1.0"
+description = "Cross-evaluation of interobserver contour variation in prostate VMAT"
+requires-python = ">=3.11"
+dependencies = [
+    "pydicom>=3.0",
+    "numpy>=2.0",
+    "scipy>=1.14",
+    "pandas>=2.2",
+    "pyarrow>=17.0",
+    "SimpleITK>=2.4",
+    "scikit-image>=0.24",
+    "shapely>=2.0",
+    "matplotlib>=3.9",
+    "PyYAML>=6.0",
+    "statsmodels>=0.14",
+]
+
+[project.optional-dependencies]
+dev = ["pytest>=8.0", "ruff>=0.6", "mypy>=1.11"]
+validate = ["dicompyler-core>=0.5.6"]
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"
+
+[tool.ruff]
+line-length = 100
+src = ["src", "pipelines", "analysis"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.12"
+ignore_missing_imports = true

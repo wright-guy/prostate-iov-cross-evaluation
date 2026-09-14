@@ -1,0 +1,181 @@
+# Contour-comparison metrics for Aim 3 (planning document section 7.4).
+#
+# A TENSION WITH THE PLANNING DOCUMENT, RESOLVED HERE AND FLAGGED.
+# Section 7.4 says "pre-specify ~8 metrics, no more", then lists roughly fourteen across
+# its three classes. Both instructions cannot be honoured at once, and the "no more"
+# clause is the one that protects the paper: the more metrics enter the primary grid,
+# the harder the multiplicity correction bites and the easier it is to find a spurious
+# winner. So eight are pre-specified as PRIMARY, chosen to span the three classes evenly
+# (3 unsigned, 2 signed, 3 dose-aware) rather than to favour any hypothesis. The rest
+# are retained as SECONDARY: computed and reported, excluded from the primary
+# metric x endpoint grid and its FDR correction, and never promoted after the fact.
+
+primary:
+
+  # --- unsigned: invariant to the direction of disagreement, which is H6's claim ---
+
+  - id: dsc
+    class: unsigned
+    label: Dice similarity coefficient
+    kind: dice
+    unit: dimensionless
+
+  - id: hd95
+    class: unsigned
+    label: 95th percentile Hausdorff distance
+    kind: hausdorff_percentile
+    percentile: 95
+    unit: mm
+    note: >-
+      Symmetric form. Carries a floor set by the slice thickness (2.5 mm, 2.0 mm for
+      V027) because the analysis grid keeps native CT spacing in z; stated in methods.
+
+  - id: msd
+    class: unsigned
+    label: Mean surface distance
+    kind: mean_surface_distance
+    signed: false
+    unit: mm
+
+  # --- signed: can distinguish over- from under-contouring ---
+
+  - id: signed_volume_difference
+    class: signed
+    label: Signed volume difference
+    kind: relative_volume_difference
+    formula: (V_i - V_j) / V_j
+    unit: dimensionless
+
+  - id: signed_msd
+    class: signed
+    label: Signed mean surface distance
+    kind: mean_surface_distance
+    signed: true
+    unit: mm
+    note: Positive where contour i lies outside contour j.
+
+  # --- dose-aware: only the irradiated part of a surface can matter dosimetrically ---
+
+  - id: mean_dose_in_fn
+    class: dose_aware
+    label: Mean dose in the false-negative volume
+    kind: mean_dose_in_region
+    region: j_minus_i
+    unit: Gy
+    note: >-
+      Anatomy present in the truth but missed by the planning contour. For a target this
+      is the under-covered tissue; for an OAR it is unaccounted irradiated organ.
+
+  - id: mean_dose_in_fp
+    class: dose_aware
+    label: Mean dose in the false-positive volume
+    kind: mean_dose_in_region
+    region: i_minus_j
+    unit: Gy
+
+  - id: dsc_in_high_dose
+    class: dose_aware
+    label: Dice restricted to the 90% isodose region
+    kind: dice
+    restrict_to_isodose_gy: 70.2
+    unit: dimensionless
+    note: 90% of the 78 Gy prescription. Overlap where the dose can actually respond.
+
+secondary:
+  # Computed and reported; not in the primary grid or its FDR correction.
+
+  - id: surface_dsc_3mm
+    class: unsigned
+    label: Surface DSC at 3 mm
+    kind: surface_dice
+    tolerance_mm: 3.0
+    unit: dimensionless
+    note: >-
+      Tolerance chosen as roughly one CT slice thickness, the smallest clinically
+      meaningful surface discrepancy this data can resolve. Section 7.4 asks for one
+      clinically justified tolerance; only one is used, and it is fixed here in advance.
+
+  - id: apl
+    class: unsigned
+    label: Added path length
+    kind: added_path_length
+    unit: mm
+
+  - id: fp_volume
+    class: signed
+    label: False-positive volume
+    kind: region_volume
+    region: i_minus_j
+    unit: cc
+
+  - id: fn_volume
+    class: signed
+    label: False-negative volume
+    kind: region_volume
+    region: j_minus_i
+    unit: cc
+
+  - id: dose_weighted_surface_distance
+    class: dose_aware
+    label: Dose-weighted surface distance
+    kind: mean_surface_distance
+    weight_by: dose
+    unit: mm_Gy
+
+  - id: integral_dose_in_fn
+    class: dose_aware
+    label: Integral dose in the false-negative volume
+    kind: integral_dose_in_region
+    region: j_minus_i
+    unit: Gy_cc
+
+  - id: integral_dose_in_fp
+    class: dose_aware
+    label: Integral dose in the false-positive volume
+    kind: integral_dose_in_region
+    region: i_minus_j
+    unit: Gy_cc
+
+  - id: posterior_interface_overlap
+    class: dose_aware
+    label: Target-rectum interface overlap, posterior aspect
+    kind: interface_overlap
+    structures: [CTV, Rectum]
+    aspect: posterior
+    unit: dimensionless
+    note: >-
+      The anatomical site where target and OAR contouring decisions trade against each
+      other most directly. Its dose-weighted variant is reported alongside.
+
+  - id: posterior_interface_overlap_dose_weighted
+    class: dose_aware
+    label: Target-rectum posterior interface overlap, dose-weighted
+    kind: interface_overlap
+    structures: [CTV, Rectum]
+    aspect: posterior
+    weight_by: dose
+    unit: Gy
+
+# Prediction targets, both reported (section 7.4).
+prediction_targets:
+  - id: replanning_benefit
+    label: Replanning benefit
+    formula: endpoint(j, j) - endpoint(i, j)
+    role: primary
+    note: >-
+      Non-circular. Not computable at decision time, since it needs the replan you are
+      deciding whether to do, but it is available on the diagonal here. Answers "is this
+      contour difference worth a replan?" and is directly relevant to adaptive RT and
+      auto-contour QA.
+  - id: estimation_error
+    label: Estimation error
+    formula: endpoint(i, j) - endpoint(i, i)
+    role: secondary
+    note: >-
+      Directly computable given the dose and both contours, so usable as a pre-plan
+      screening or ranking tool -- and only that. Stated as such in the paper.
+
+# Section 7.4 is explicit: no acceptability thresholds are derived. The form of a useful
+# metric may be proposed; deriving thresholds needs a far larger cohort. Said in the
+# paper to pre-empt the request.
+derive_thresholds: false

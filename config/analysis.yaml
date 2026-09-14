@@ -1,0 +1,147 @@
+# The statistical plan. Fixed before any result is computed; the git tag on
+# docs/PROTOCOL.md is what makes that claim checkable.
+
+design:
+  index_i: contour set the plan was optimised on
+  index_j: contour set used as the assumed true anatomy
+  arms:
+    S: {definition: "i != j, both observers", n_cells: 432, role: single-observer status quo}
+    C: {definition: "i = VOTE, j = observer", n_cells: 49, role: consensus mitigation}
+    diagonal: {definition: "i = j, both observers", n_cells: 49,
+               role: perfect-information upper bound and planning-consistency control}
+  primary_total: 530
+  secondary_j_is_vote: 54
+  excluded:
+    - {set: STAPLE, reason: plan-quality failure, planning document section 3}
+    - {patient: M030, set: O6, reason: no rectum contour and no plan exported}
+  arm_s_excludes_diagonal: >-
+    Deliberate. In reality the planning observer's contour is never exactly the truth,
+    so including i = j would inject an artificial perfect-knowledge case with
+    probability 1/10 and flatter the status quo. The diagonal is reported separately.
+
+# The three estimands. All three are reported for every endpoint; reporting only one
+# invites the objection that the comparison is a definitional artefact.
+estimands:
+  E1:
+    name: Delivery variability
+    definition: spread of the endpoint across planning contours i, for a fixed truth j
+    note: >-
+      Zero by construction in Arm C, because there is one plan. Surfaced explicitly
+      rather than left for a reviewer to point out.
+  E2:
+    name: Residual truth uncertainty
+    definition: spread of the endpoint across plausible truths j, for a fixed plan i
+    note: >-
+      Non-zero in both arms. This is what consensus cannot remove, and what
+      variability-aware robust optimisation targets.
+  E3:
+    name: Expected systematic loss
+    definition: E[endpoint(i, j)] - E[endpoint(j, j)]
+    note: The average penalty for having planned on the wrong anatomy. The headline.
+
+compression:
+  definition: R_endpoint = spread(Arm S) / spread(Arm C), on E2-comparable terms
+  geometric_benchmarks:
+    uncorrected: 1.49          # sqrt(2) / sqrt(1 - 1/N), N = 10
+    leave_one_out_corrected: 1.34
+  spread_measures:
+    # SD is not used as the primary. Dose response is asymmetric and saturating, so a
+    # symmetric second moment misrepresents it.
+    primary: iqr
+    secondary: [p5_p95_range, worst_case]
+    reported_but_not_primary: [sd]
+
+uncertainty:
+  method: cluster_bootstrap
+  cluster_unit: patient
+  n_resamples: 10000
+  seed: 20260904
+  interval: percentile
+  level: 0.95
+  note: >-
+    Resampling patients, not cells. Cells within a patient share anatomy and a dose
+    grid, so treating 530 cells as independent would understate every interval by a
+    large factor. With five patients the intervals will be wide; that is honest, and it
+    is the reason this is framed as a variance-decomposition study rather than a
+    significance-testing one.
+
+variance_decomposition:
+  model: >-
+    Y ~ 1 + (1 | Patient) + (1 | PlanObs) + (1 | EvalObs)
+        + (1 | Patient:PlanObs) + (1 | Patient:EvalObs) + (1 | PlanObs:EvalObs)
+  observers_crossed_with_patients: true
+  report: percentage of variance per component, per endpoint
+  primary_engine: R lme4
+  cross_check_engine: Python statsmodels MixedLM
+  note: >-
+    statsmodels handles crossed random effects poorly, so lme4 is primary and
+    statsmodels is the cross-check. If the two disagree by more than 2 percentage points
+    on any component, both are reported and the discrepancy stated.
+  rationale: >-
+    This is what reframes n = 5 as a variance-decomposition design rather than an
+    underpowered hypothesis test.
+
+planning_vs_evaluation_side:
+  applies_to: OAR endpoints
+  decomposition: plan effect (i) versus scoring effect (k)
+  irreducible_confound: >-
+    Plans were optimised on coherent contour sets, so planning-side target and OAR
+    influences cannot be separated from each other. Stated, not modelled away.
+
+constraint_flip_rates:
+  source: config/constraints.yaml
+  reported:
+    - binary: per-protocol versus not, as section 7.3 specifies
+    - ordinal: the full 3x3 tier-transition matrix
+  degeneracy_reported: true
+  note: >-
+    A constraint whose tier never changes contributes no information to a flip rate.
+    Which constraints are degenerate is itself a result about which parts of the
+    protocol are robust to contouring variation, so it is reported rather than dropped.
+
+prediction:
+  validation: leave_one_patient_out
+  clustering: patient-level in every correlation
+  multiplicity: {method: benjamini_hochberg, q: 0.05,
+                 grid: primary metrics x primary endpoints}
+  forbidden: >-
+    Pooling all 530 pairs into a naive Pearson r. Inter-patient anatomy would dominate
+    and generate spuriously excellent correlations. Any correlation reported is either
+    within-patient or explicitly patient-clustered.
+
+sensitivity_analyses:
+
+  - id: vote_as_truth
+    description: j = VOTE, 54 cells
+    note: >-
+      The conventional but statistically leaky choice, since VOTE is derived from the
+      ten observers. Reported as a sensitivity analysis only; showing both is a strength.
+
+  - id: tcp_calibration
+    description: TCP at the calibrated density and at the published density
+    note: >-
+      If the two disagree qualitatively, the TCP conclusions are calibration-dependent
+      and the paper says so.
+
+  - id: rigid_dose_shifts
+    status: removed_2026_09_05
+    description: plus and minus 3 and 5 mm, cardinal directions
+    note: >-
+      REMOVED at the author's direction, 2026-09-05, and recorded in the protocol
+      amendment log. It would have contextualised contour-driven variability against
+      setup-driven variability, but it adds a second uncertainty axis to a paper that
+      already carries three aims and no hypothesis depends on it. Kept here rather than
+      deleted so the paper can state what was planned and not done.
+      If it is ever reinstated: pure resampling, no dose engine, density changes
+      ignored and stated. Gaussian dose blurring must NOT be used as a margin
+      surrogate - it lowers and spreads the high-dose region, making coverage worse
+      rather than emulating a margined plan.
+
+  - id: grid_resolution
+    description: already run in stage 03
+    note: Volumes stable to better than 0.1 percent across 0.75 to 2.5 mm in plane.
+
+publishable_negative_result: >-
+  Failure to reject H3 is a genuine and useful result. If consensus does compress
+  dosimetric variability efficiently, that bounds where robust optimisation adds value.
+  The paper is written so that outcome is reportable without restructuring.

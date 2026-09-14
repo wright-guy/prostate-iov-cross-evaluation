@@ -1,0 +1,18 @@
+# Copy to config/observer_key.local.yaml (never committed) and fill in from the
+# private key. Maps each label used in config and results to the contour-set name used
+# in the raw DICOM (ROI suffix and dose folder name).
+observers:
+  O1: <name>
+  O2: <name>
+  O3: <name>
+  O4: <name>
+  O5: <name>
+  O6: <name>
+  O7: <name>
+  O8: <name>
+  O9: <name>
+  O10: <name>
+
+# Dose folder names that differ from the raw contour-set name.
+folder_alias:
+  <FOLDER>: <name>

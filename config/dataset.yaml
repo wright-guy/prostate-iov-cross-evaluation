@@ -1,0 +1,88 @@
+# Dataset definition. Everything the pipeline knows about the raw data lives here,
+# never hard-coded in a module. See docs/DECISIONS.md for the reasoning behind each choice.
+
+project: MultiContouring
+
+roots:
+  # Relative to the repository root. data/ is READ-ONLY.
+  dicom: data/Newcastle_DICOMs_and_RTSTRUCTs
+  dose: data/VMAT_dose
+  rtplan: data/RTPLANs          # not yet populated; 59 files requested 2026-09-04
+
+# Derived cache. Resolution order: $MCX_DERIVED, then this key, then
+# %LOCALAPPDATA%/MultiContouring/derived. Deliberately NOT inside OneDrive:
+# a multi-GB mask cache in a synced folder causes constant re-upload and file locks.
+derived: null
+
+patients: [K018, K042, M020, M030, V027]
+
+# The ten independent observers. Order is the order they appear in the merged RTSTRUCT.
+observers: [O4, O10, O8, O2, O7, O6, O9, O1, O5, O3]
+
+# Derived contour sets present in the data.
+derived_sets: [VOTE, STAPLE]
+
+# The consensus contour. Its plan forms Arm C of the cross-evaluation.
+consensus_set: VOTE
+
+# Contour sets entering the primary analysis.
+#   observers + VOTE — Arm S and Arm C respectively
+#   STAPLE           — excluded, plan-quality failure (planning doc §3; user 2026-09-04)
+analysis_sets: [O4, O10, O8, O2, O7, O6, O9, O1, O5, O3, VOTE]
+
+# Contour sets admissible as the assumed true anatomy (index j). VOTE is a derived
+# quantity from the ten observers, not an independent plausible truth, so it is
+# excluded here and reported only as a secondary sensitivity analysis (§3).
+truth_sets: [O4, O10, O8, O2, O7, O6, O9, O1, O5, O3]
+
+# Observers are labelled O1-O10. The names used in the raw DICOM, and the one dose
+# folder whose name differs in case from its ROI suffix, are held in
+# config/observer_key.local.yaml, which is never committed (see the example file).
+# Never resolve a folder-name mismatch with .lower().
+
+# (patient, contour_set) combinations that legitimately do not exist.
+# Any OTHER missing combination is a QC failure, not an expected gap.
+known_absent:
+  - patient: M030
+    contour_set: O6
+    reason: >-
+      Rectum_O6 absent from the M030 structure set and no M030/O6 plan was
+      exported. Confirmed by the user 2026-09-04; O6 is dropped from M030 and the
+      design is unbalanced.
+
+prescription:
+  total_dose_gy: 78.0            # confirmed by the user, 2026-09-04
+  n_fractions: 39                # RTPLAN FractionGroupSequence.NumberOfFractionsPlanned
+  dose_per_fraction_gy: 2.0
+  unconfirmed: false
+  source: user_and_rtplan
+  clinical_protocol: >-
+    Department protocol "Definitive Prostate +/- SV: 78 Gy to D95"
+    (PMBaaa50c supplementary material, Table 1). Full constraint list, including the
+    three-tier per-protocol / minor / major bands, is in config/constraints.yaml.
+  note: >-
+    The clinical protocol normalises to PTV D95 = 78 Gy. The research plans here are
+    CTV-optimised with no PTV objective and do not follow that convention: their
+    diagonal PTV D95 is 76.4-78.0 Gy while diagonal CTV D50 is pinned at 80.25 Gy
+    (SD 0.128 across 54 plans). Stated in the methods, and the reason PTV-based
+    constraints are expected to sit systematically in minor variation.
+
+delivery:
+  # From the one RTPLAN supplied (V027/O9). To be verified across all 59 once provided.
+  machine: ElektaVersaHD
+  energy_mv: 6
+  technique: VMAT
+  arcs: 1
+  arc_span_deg: 352
+  verified_across_all_plans: false
+
+provenance_notes:
+  - >-
+    PatientName is '<initials>_Atlas_<patient>_CT' on every RTDOSE and RTPLAN file, so the
+    dose folder name is the only thing linking a dose to an observer. Tier 1 QC
+    verifies that mapping independently via the PTV D98 self-plan identifiability test.
+  - >-
+    Each RTPLAN references a per-observer structure set that is NOT in this dataset.
+    The RTSTRUCT supplied per patient is a single merged set (StructureSetLabel
+    'Contour_<initials>') exported minutes later. Identity of the contours between the two
+    cannot be proven from the DICOM and is instead evidenced by the Tier 1 test.

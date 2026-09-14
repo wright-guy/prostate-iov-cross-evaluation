@@ -1,0 +1,98 @@
+# Accepted QC failures. A FAIL halts the pipeline unless it appears here with a
+# written justification. Every entry is reproduced verbatim in the methods.
+#
+# Fields:
+#   check     - the check id emitted by src/mcx/qc/checks.py
+#   scope     - optional {patient, contour_set, structure} restriction; omitted = global
+#   until     - optional ISO date after which the waiver expires and the gate re-fires
+#   reason    - why this is acceptable. Written for a reviewer, not for a developer.
+
+waivers:
+
+  - check: dose.summation_type_is_plan
+    reason: >-
+      DoseSummationType is BEAM with ReferencedBeamNumber = 1 on all 59 RTDOSE files.
+      Two RTPLANs (V027/O9 and M030/O5) show single-arc VMAT plans -- one DYNAMIC beam
+      of 89 control points spanning 352 degrees, 39 fractions, 6 MV on an Elekta
+      VersaHD -- so with one beam in the plan the beam dose IS the plan dose and the
+      tag is literally correct.
+      The claim that this holds for all 59 does not rest on those two files. It rests
+      on the dose data directly: a file containing only one arc of a multi-arc plan
+      would show roughly half the intended dose, and the diagonal CTV D50 of every plan
+      falls between 79.97 and 80.55 Gy (median 80.25, SD 0.128). No dose file is a
+      partial delivery. This also accounts for M030/O3, whose dose grid is larger than
+      every other (80x106x93): its maximum is 83.12 Gy and its D50 is in band, so the
+      grid is a manually enlarged calculation box rather than a second arc.
+
+  - check: struct.plan_referenced_structure_set_present
+    reason: >-
+      Each RTPLAN references a per-observer structure set that was not exported with
+      this dataset; the supplied RTSTRUCT is a single merged set (StructureSetLabel
+      'Contour_<initials>') written minutes later. Contour identity between the two therefore
+      cannot be proven from UIDs. It is instead evidenced by the Tier 1 self-plan
+      identifiability test, which places the diagonal at or within tolerance of every
+      row maximum. Stated as a limitation in the methods.
+
+  - check: struct.roi_set_complete
+    scope:
+      contour_set: VOTE
+    reason: >-
+      VOTE carries only CTV, PTV, Rectum and Bladder by design — no seminal vesicles,
+      colon, bowel bag or PRS. Those structures are outside the endpoint list in §5, so
+      the consensus arm is unaffected. VOTE is the consensus contour set and forms
+      Arm C of the cross-evaluation.
+
+  - check: struct.roi_set_complete
+    scope:
+      contour_set: STAPLE
+    reason: >-
+      As VOTE, and STAPLE is excluded from the analysis entirely for plan quality
+      (planning document §3; confirmed by the user 2026-09-04). It is still extracted so
+      the exclusion stays reversible without a re-run. The precise failure mode is
+      PENDING Q8 and must be evidenced before publication.
+
+  - check: struct.roi_present
+    scope:
+      patient: M030
+      contour_set: O6
+      structure: Rectum
+    reason: >-
+      Rectum_O6 is absent from the M030 structure set and no M030/O6 plan exists.
+      O6 is dropped from M030, making the design unbalanced at 481 primary cells.
+      Confirmed by the user 2026-09-04.
+
+  - check: raster.no_slices_dropped_on_dose_grid
+    scope:
+      patient: V027
+    reason: >-
+      V027's planning CT has 2.0 mm slice spacing while every dose grid in the dataset
+      is 2.5 mm isotropic, so contours fall between dose-grid planes and roughly a
+      quarter of each structure's volume is lost when rasterising onto the native dose
+      grid. This affects the Tier 1 mapping test only, which is computed on the native
+      grid for speed; the mapping conclusion is unchanged (permutation p at the floor
+      of 5.0e-05) but the absolute volumes in tier1_cross_matrix.parquet are not usable
+      for V027. From stage 05 onward every contour and every dose is resampled onto a
+      common CT-derived analysis grid, where no contour is dropped, and the Tier 1
+      statistic is recomputed there as confirmation.
+
+  - check: raster.no_degenerate_loops
+    scope:
+      patient: M020
+      contour_set: O2
+      structure: Bladder
+    reason: >-
+      A single stray one-point contour at z = 12.5 mm, carrying zero area, on a slice
+      that also holds the real 206-point bladder contour of 3607 mm2. It is a stray
+      click in the contouring session. Dropping it removes 0.000 mm2 and changes no
+      endpoint.
+
+  - check: raster.no_subvoxel_slivers
+    scope:
+      patient: V027
+      contour_set: O6
+      structure: Bladder
+    reason: >-
+      A three-point triangle of 0.09 mm2 (roughly 0.6 x 0.3 mm) at z = -16.0 mm, on a
+      slice that also holds the real 402-point bladder contour of 2723 mm2. It is
+      narrower than one voxel at any resolution on the convergence ladder, so it cannot
+      be rasterised at all. Dropping it removes 0.003% of that slice's area.
