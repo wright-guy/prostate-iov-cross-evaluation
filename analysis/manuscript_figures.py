@@ -1,8 +1,8 @@
-"""Figures 1-4 of the manuscript, written to paper/figures/.
+"""Figures 1-5 of the manuscript, written to paper/figures/.
 
     python analysis/manuscript_figures.py
 
-Figures 1, 3 and 4 read results/ only. Figure 2 also reads the planning CT, the cached
+Figure 1 is a schematic. Figures 2, 4 and 5 read results/ only. Figure 3 also reads the planning CT, the cached
 analysis-grid masks and the cached resampled dose for one patient, so it needs data/ and
 the derived cache.
 """
@@ -85,10 +85,75 @@ def observer_cells(endpoints: pd.DataFrame, endpoint: str) -> pd.DataFrame:
 
 
 # ============================================================================ Figure 1
-def figure1(ep: pd.DataFrame, patient: str = "K018", row: str = "O10", col: str = "O4") -> None:
-    """Cross-evaluation matrices for one patient: CTV D98 and rectum V70."""
+def figure_schematic() -> None:
+    """Data-free schematic of the cross-evaluation design (Methods)."""
+    n, i, j = 5, 1, 3  # grid size and the example plan i and contour j (0-based)
+    row_c, col_c, cell_c = "#f4c7c1", "#c6dbef", "#0c666d"
+    fig, ax = plt.subplots(figsize=(FULL_WIDTH, 3.1))
+
+    def cell(r, c, face, text="", tcolor="black", hatch=None):
+        ax.add_patch(Rectangle((c, -r - 1), 1, 1, fc=face, ec="0.35", lw=0.8, hatch=hatch))
+        if text:
+            ax.text(c + 0.5, -r - 0.5, text, ha="center", va="center", fontsize=7.5,
+                    color=tcolor)
+
+    for r in range(n):
+        for c in range(n):
+            face = "white"
+            if r == i:
+                face = row_c
+            if c == j:
+                face = col_c if r != i else face
+            cell(r, c, face)
+    for k in range(n):
+        cell(k, k, "0.82")
+    cell(i, i, "0.82", r"$E_{i,i}$")
+    cell(j, j, "0.82", r"$E_{j,j}$")
+    cell(i, j, cell_c, r"$E_{i,j}$", tcolor="white")
+    # consensus plan row, set apart below the observer plans
+    for c in range(n):
+        cell(n + 0.35, c, "#fbeccd")
+    ax.text(-0.2, -n - 0.85, "C", ha="right", va="center", fontsize=8)
+
+    labels = ["1", r"$i$", r"$\cdots$", r"$j$", r"$n$"]
+    for k, lab in enumerate(labels):
+        ax.text(k + 0.5, 0.25, lab, ha="center", va="bottom", fontsize=8)
+        ax.text(-0.2, -k - 0.5, lab, ha="right", va="center", fontsize=8)
+    ax.text(n / 2, 0.95, "Observer contour set used for evaluation", ha="center", fontsize=8)
+    ax.text(-0.95, -n / 2, "Plan, by the contour set\nit was optimised on", ha="center",
+            va="center", rotation=90, fontsize=8)
+
+    x0 = n + 0.9
+    notes = [
+        (row_c, "Row $i$: one delivered plan evaluated on every observer's contours. "
+                "The dose is fixed and only the contour varies.\n"
+                r"Estimation error: $E_{i,j} - E_{i,i}$"),
+        (col_c, "Column $j$: every observer plan evaluated on one contour set. "
+                "The anatomy is fixed and the plan varies.\n"
+                r"Replanning benefit: $E_{j,j} - E_{i,j}$"),
+        ("0.82", "Diagonal: each plan evaluated on the contour it was optimised on "
+                 "(self-evaluation)."),
+        ("#fbeccd", "C: the consensus plan, evaluated on every observer's contours."),
+    ]
+    y = -0.1
+    import textwrap
+    for face, text in notes:
+        ax.add_patch(Rectangle((x0, y - 0.55), 0.45, 0.45, fc=face, ec="0.35", lw=0.8))
+        wrapped = "\n".join(textwrap.fill(part, 62) for part in text.split("\n"))
+        ax.text(x0 + 0.65, y - 0.1, wrapped, va="top", fontsize=7.5)
+        y -= 0.45 + 0.42 * (wrapped.count("\n") + 1)
+    ax.set_xlim(-1.4, x0 + 7.2)
+    ax.set_ylim(-n - 1.55, 1.3)
+    ax.set_aspect("equal")
+    ax.axis("off")
+    save(fig, "fig1_design_schematic")
+
+
+# ============================================================================ Figure 2
+def figure_matrices(ep: pd.DataFrame, patient: str = "K018") -> None:
+    """Cross-evaluation matrices for one patient: CTV D98 and rectum V70 (Results)."""
     panels = [("ctv_d98", r"CTV $D_{98}$ (Gy)"), ("rectum_v70pct", r"Rectum $V_{70}$ (%)")]
-    fig, axes = plt.subplots(1, 2, figsize=(FULL_WIDTH, 3.35))
+    fig, axes = plt.subplots(1, 2, figsize=(FULL_WIDTH, 3.2))
     for ax, (endpoint, title), letter in zip(axes, panels, "ab", strict=True):
         cells = observer_cells(ep, endpoint)
         wide = cells[cells.patient == patient].pivot(index="plan_set", columns="truth_set",
@@ -98,10 +163,6 @@ def figure1(ep: pd.DataFrame, patient: str = "K018", row: str = "O10", col: str 
         im = ax.imshow(m, cmap="viridis", aspect="equal")
         for k in range(len(ids)):
             ax.add_patch(Rectangle((k - 0.5, k - 0.5), 1, 1, fill=False, ec="white", lw=1.4))
-        r, c = ids.index(row), ids.index(col)
-        ax.add_patch(Rectangle((-0.5, r - 0.5), len(ids), 1, fill=False, ec="#e8412c", lw=1.8))
-        ax.add_patch(Rectangle((c - 0.5, -0.5), 1, len(ids), fill=False, ec="#f5a623", lw=1.8,
-                               ls=(0, (3, 1.5))))
         ticks = [LABEL[s] for s in ids]
         ax.set_xticks(range(len(ids)), ticks, rotation=90)
         ax.set_yticks(range(len(ids)), ticks)
@@ -112,15 +173,8 @@ def figure1(ep: pd.DataFrame, patient: str = "K018", row: str = "O10", col: str 
             ax.spines[s].set_visible(True)
         cb = fig.colorbar(im, ax=ax, fraction=0.046, pad=0.03)
         cb.ax.tick_params(labelsize=7)
-    handles = [Line2D([], [], color="white", marker="s", mec="0.4", ls="", ms=7,
-                      label="Self-evaluation ($i = j$)"),
-               Line2D([], [], color="#e8412c", lw=1.8, label="Row: fixed dose, contour varied"),
-               Line2D([], [], color="#f5a623", lw=1.8, ls=(0, (3, 1.5)),
-                      label="Column: fixed contour, plan varied")]
-    fig.legend(handles=handles, loc="lower center", ncol=3, frameon=False,
-               bbox_to_anchor=(0.5, -0.04))
-    fig.tight_layout(rect=(0, 0.05, 1, 1))
-    save(fig, "fig1_cross_evaluation")
+    fig.tight_layout()
+    save(fig, "fig2_cross_evaluation_matrices")
 
 
 # ============================================================================ Figure 2
@@ -227,7 +281,7 @@ def figure2(ep: pd.DataFrame, patient: str = "K018", plan: str = "O10") -> None:
     for text in leg.get_texts():
         if text.get_text() == "Consensus CTV":
             leg.legend_handles[len(ids)].set_color("0.35")
-    save(fig, "fig2_example_patient")
+    save(fig, "fig3_example_patient")
 
 
 # ============================================================================ Figure 3
@@ -269,7 +323,7 @@ def figure3(con: pd.DataFrame) -> None:
                       label="Evaluated on another observer's contour")]
     ax.legend(handles=handles, loc="upper center", ncol=5, frameon=False,
               bbox_to_anchor=(0.5, 1.13), handlelength=1.2, columnspacing=1.0)
-    save(fig, "fig3_rectum_v70_compliance")
+    save(fig, "fig4_rectum_v70_compliance")
 
 
 # ============================================================================ Figure 4
@@ -320,16 +374,17 @@ def figure4() -> None:
     fig.legend(handles, labels, loc="lower center", ncol=5, frameon=False,
                bbox_to_anchor=(0.5, -0.02), markerscale=2)
     fig.tight_layout(rect=(0, 0.04, 1, 1))
-    save(fig, "fig4_geometry_vs_dose")
+    save(fig, "fig5_geometry_vs_dose")
 
 
 if __name__ == "__main__":
     endpoints = pd.read_parquet(RES / "endpoints_long.parquet")
     constraints = pd.read_parquet(RES / "constraints_long.parquet")
-    figure1(endpoints)
+    figure_schematic()
+    figure_matrices(endpoints)
     figure3(constraints)
     figure4()
     if cfg.dicom_root.exists():
         figure2(endpoints)
     else:
-        print("Figure 2 skipped: it needs the planning CT, masks and dose (data/ not found)")
+        print("Figure 3 skipped: it needs the planning CT, masks and dose (data/ not found)")
