@@ -125,7 +125,7 @@ def figure_schematic() -> None:
 
     x0 = n + 0.9
     notes = [
-        (row_c, "Row $i$: one delivered plan evaluated on every observer's contours. "
+        (row_c, "Row $i$: one plan evaluated on every observer's contours. "
                 "The dose is fixed and only the contour varies.\n"
                 r"Estimation error: $E_{i,j} - E_{i,i}$"),
         (col_c, "Column $j$: every observer plan evaluated on one contour set. "
@@ -152,7 +152,7 @@ def figure_schematic() -> None:
 # ============================================================================ Figure 2
 def figure_matrices(ep: pd.DataFrame, patient: str = "K018") -> None:
     """Cross-evaluation matrices for one patient: CTV D98 and rectum V70 (Results)."""
-    panels = [("ctv_d98", r"CTV $D_{98}$ (Gy)"), ("rectum_v70pct", r"Rectum $V_{70}$ (%)")]
+    panels = [("ctv_d98", r"CTV $D_{98\%}$ (Gy)"), ("rectum_v70pct", r"Rectum $V_{70\,\mathrm{Gy}}$ (%)")]
     fig, axes = plt.subplots(1, 2, figsize=(FULL_WIDTH, 3.2))
     for ax, (endpoint, title), letter in zip(axes, panels, "ab", strict=True):
         cells = observer_cells(ep, endpoint)
@@ -200,7 +200,7 @@ def ct_on_grid(patient: str, grid) -> np.ndarray:  # noqa: ANN001
 
 
 def figure2(ep: pd.DataFrame, patient: str = "K018", plan: str = "O10") -> None:
-    """One delivered plan, ten rectum contours: anatomy and the resulting DVHs."""
+    """One plan, ten rectum contours: anatomy and the resulting DVHs."""
     grid = load_grid(cfg, patient)
     masks, doses = MaskStore(cfg), DoseStore(cfg)
     ids = [s for s in BY_LABEL if masks.has(patient, s, "Rectum")]
@@ -270,7 +270,7 @@ def figure2(ep: pd.DataFrame, patient: str = "K018", plan: str = "O10") -> None:
     ax_d.set_title(f"(c) Rectum DVH, plan {LABEL[plan]}", loc="left")
     v70 = observer_cells(ep, "rectum_v70pct")
     v70 = v70[(v70.patient == patient) & (v70.plan_set == plan)].value
-    ax_d.text(71, 56, f"$V_{{70}}$: {v70.min():.1f}–{v70.max():.1f}%", fontsize=7, va="top")
+    ax_d.text(71, 56, rf"$V_{{70\,\mathrm{{Gy}}}}$: {v70.min():.1f}–{v70.max():.1f}%", fontsize=7, va="top")
 
     handles = [Line2D([], [], color=colours[s], lw=1.6 if s == plan else 1.0, label=LABEL[s])
                for s in ids]
@@ -313,7 +313,7 @@ def figure3(con: pd.DataFrame) -> None:
     ax.tick_params(axis="x", length=0)
     ax.set_xlim(-1, x - gap + 1)
     ax.set_ylim(0, 36)
-    ax.set_ylabel(r"Rectum $V_{70}$ (%)")
+    ax.set_ylabel(r"Rectum $V_{70\,\mathrm{Gy}}$ (%)")
     handles = [Patch(color=TIER_COLOURS["per_protocol"], label=r"Per protocol ($\leq$10%)"),
                Patch(color=TIER_COLOURS["minor"], label="Minor variation (10–20%)"),
                Patch(color=TIER_COLOURS["major"], label="Major variation (>20%)"),
@@ -337,9 +337,9 @@ def figure4() -> None:
     """Estimation error against unsigned and signed geometric agreement."""
     f = pd.read_parquet(RES / "aim3_features.parquet")
     rho = pd.read_parquet(RES / "section4_per_patient_rho.parquet")
-    rows = [("ctv_d98", r"CTV $D_{98}$ estimation error (Gy)", 1.0),
+    rows = [("ctv_d98", r"CTV $D_{98\%}$ estimation error (Gy)", 1.0),
             ("ntcp_rectum_relative", "Rectal NTCP estimation error (pp)", 100.0)]
-    cols = [("dsc", "Dice"), ("signed_msd_mm", "Signed MSD (mm)")]
+    cols = [("dsc", "DSC"), ("signed_msd_mm", "Signed MSD (mm)")]
     fig, axes = plt.subplots(2, 2, figsize=(FULL_WIDTH, 4.9))
     letters = iter("abcd")
     for r, (endpoint, ylab, scale) in enumerate(rows):
