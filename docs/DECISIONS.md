@@ -832,3 +832,26 @@ supplementary note, and both estimators remain in Tables S5-S6.
    ceiling; the estimation error is the clean test.
 
 Numbers from `analysis/revision_checks.py`.
+
+## 2026-10-26 - The plans were PTV-optimised (supersedes 2026-09-04)
+
+Prompted by a co-author's review of the manuscript, the author confirmed that each plan was
+optimised to its contour set's PTV (its CTV + 7 mm, the margin of the parent studies) and
+normalised to CTV D50 (mean 80.25 Gy). The 2026-09-04 entry ("CTV-optimised; PTVs post-hoc")
+is superseded.
+
+**Evidence** (read-only checks of the planning exports):
+- No RTPLAN records its optimisation target, and no planning structure set contains the
+  observer's own PTV, so the exports alone could not settle it.
+- Each plan's 95% isodose volume follows its own observer's CTV volume (Spearman rho +0.87 to
+  +0.96 within every patient), so the plans were not optimised to one shared target.
+- Each plan covers its own CTV + 7 mm at prescription level: self-evaluated V95% median 100.0%
+  (range 97.9-100.0) and D98 median 77.2 Gy (range 74.0-78.1), from the expansion-shell
+  endpoints. A plan optimised to the CTV alone would not cover a 7 mm margin at the
+  prescription.
+
+**Consequence.** No result changes: every endpoint is computed from the plans' doses as they
+are. Descriptions change: the PTV coverage constraints are not reported because the plans were
+normalised to CTV D50 rather than the protocol's PTV D95, and the plans are not an upper bound
+on target sensitivity for want of a margin. The analysis protocol's amendment log records the
+correction.

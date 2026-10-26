@@ -286,3 +286,11 @@ Benjamini-Hochberg correction are replaced by within-patient Spearman correlatio
 summarised over patients, with leave-one-patient-out R-squared as the measure of predictive
 value. The pooled p-values treated non-independent comparisons within a patient as
 independent.
+
+**2026-10-26 - plan optimisation target corrected (correction of fact).** The plans were
+optimised to each contour set's PTV (CTV + 7 mm) and normalised to CTV D50, not optimised to the
+CTV with the PTVs created afterwards, as stated above. The analysis is unchanged: it uses the
+plans' doses as they are, and every endpoint is unaffected. Two statements change. The PTV
+coverage constraints are not reported because the plans were normalised to CTV D50 rather than
+the protocol's PTV D95, not because the plans had no PTV objective. And the plans are not an
+upper bound on target sensitivity for want of a margin. Evidence: DECISIONS 2026-10-26.

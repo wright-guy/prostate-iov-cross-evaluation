@@ -14,7 +14,9 @@ structures:
     in_analysis: true
     fill: even_odd
     plausible_volume_cc: [10, 150]
-    note: The optimisation target. Plans are CTV-optimised (user, 2026-09-04).
+    note: >-
+      The clinical target. The plans were optimised to the PTV built from it (corrected
+      2026-10-26, superseding 2026-09-04; see docs/DECISIONS.md).
 
   PTV:
     roi: "PTV_{set}"
@@ -23,9 +25,10 @@ structures:
     fill: even_odd
     plausible_volume_cc: [30, 400]
     note: >-
-      Isotropic expansion of the CTV created AFTER planning (user, 2026-09-04).
-      Not an optimisation structure. Used for the Tier 1 self-plan identifiability
-      test and for incidental-coverage reporting only.
+      Isotropic 7 mm expansion of the CTV, and the optimisation target of each plan
+      (corrected 2026-10-26, superseding "created after planning" of 2026-09-04; see
+      docs/DECISIONS.md). Also used for the Tier 1 self-plan identifiability test. The
+      role key keeps its old value so the pipeline's behaviour is unchanged.
       The expansion distance appears nowhere in the DICOM and was measured back out of
       the masks in stage 03: the median CTV-surface-to-PTV-surface distance is
       7.07 mm in all five patients (IQR 1.0 mm), with no anterior/posterior/lateral

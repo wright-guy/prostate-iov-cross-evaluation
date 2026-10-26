@@ -2,8 +2,9 @@
 
     python analysis/revision_checks.py
 
-- How close the CTV-optimised plans come to a PTV-sized high-dose region (treated volume
-  against post-hoc PTV volume), without reporting PTV dose metrics.
+- How close the plans' high-dose region comes to the PTV (treated volume against PTV
+  volume), without reporting PTV dose metrics. (The plans were PTV-optimised; see
+  docs/DECISIONS.md, 2026-10-26.)
 - Where the plan optimised on the correct contour ranks within its column, against the
   rank ten interchangeable plans would give.
 - Within-patient Spearman correlations for the geometric metrics of Section 4, summarised

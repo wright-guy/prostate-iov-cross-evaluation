@@ -171,9 +171,7 @@ def methods_section(cfg: Config, r) -> tuple[Section, list[Quotable]]:  # noqa: 
             Block(
                 "Treatment and normalisation",
                 q[2].statement + " " + q[3].statement,
-                "The department protocol prescribes to PTV D95 = 78 Gy. These plans are "
-                "CTV-optimised with no PTV objective and do not follow that convention, "
-                "by design — which is why PTV-based constraints sit systematically in "
+                "The department protocol prescribes to PTV D95 = 78 Gy. These plans are " "optimised to each contour set's PTV (CTV + 7 mm) but normalised to CTV D50, " "so they do not follow that convention, by design — which is why PTV-based constraints sit systematically in "
                 "minor variation.",
                 source="diagonal_endpoints.parquet, stage 06",
             ),

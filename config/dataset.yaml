@@ -62,7 +62,8 @@ prescription:
     three-tier per-protocol / minor / major bands, is in config/constraints.yaml.
   note: >-
     The clinical protocol normalises to PTV D95 = 78 Gy. The research plans here are
-    CTV-optimised with no PTV objective and do not follow that convention: their
+    optimised to each contour set's PTV (CTV + 7 mm; corrected 2026-10-26) but normalised
+    to CTV D50, so they do not follow that convention: their
     diagonal PTV D95 is 76.4-78.0 Gy while diagonal CTV D50 is pinned at 80.25 Gy
     (SD 0.128 across 54 plans). Stated in the methods, and the reason PTV-based
     constraints are expected to sit systematically in minor variation.
